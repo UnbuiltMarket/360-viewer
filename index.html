@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>360 Panorama Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js?module';
+    import { OrbitControls } from 'https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js?module';
+
+    let scene = new THREE.Scene();
+    let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    let renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio); // <-- Add this line
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.NoToneMapping;
+    document.body.appendChild(renderer.domElement);
+
+    // Load panorama texture
+    let textureLoader = new THREE.TextureLoader();
+    textureLoader.load(
+      'my_panorama.jpg', // <-- your 360 render filename here
+      function(texture) {
+        let geometry = new THREE.SphereGeometry(500, 120, 80); // more segments
+        geometry.scale(-1, 1, 1);
+        let material = new THREE.MeshBasicMaterial({ map: texture });
+        material.map.encoding = THREE.sRGBEncoding;
+        let mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+      },
+      undefined,
+      function(err) {
+        console.error('Error loading panorama:', err);
+      }
+    );
+
+    camera.position.set(0, 0, 0.1);
+
+    // Controls
+    let controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = false;
+    controls.enablePan = false;
+    controls.rotateSpeed = -0.25;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', function() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
