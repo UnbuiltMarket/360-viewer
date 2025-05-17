@@ -6,9 +6,18 @@
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
+    #toggleOverlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
+  <button id="toggleOverlay">Show Overlay</button>
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js?module';
     import { OrbitControls } from 'https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js?module';
@@ -16,27 +25,40 @@
     let scene = new THREE.Scene();
     let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     let renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio); // <-- Add this line
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.NoToneMapping;
     document.body.appendChild(renderer.domElement);
 
-    // Load panorama texture
+    let baseMesh, overlayMesh;
+
+    // Load base panorama
     let textureLoader = new THREE.TextureLoader();
     textureLoader.load(
-      'my_panorama.jpg', // <-- your 360 render filename here
+      'my_panorama.jpg',
       function(texture) {
-        let geometry = new THREE.SphereGeometry(500, 120, 80); // more segments
+        let geometry = new THREE.SphereGeometry(500, 120, 80);
         geometry.scale(-1, 1, 1);
         let material = new THREE.MeshBasicMaterial({ map: texture });
         material.map.encoding = THREE.sRGBEncoding;
-        let mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
-      },
-      undefined,
-      function(err) {
-        console.error('Error loading panorama:', err);
+        baseMesh = new THREE.Mesh(geometry, material);
+        scene.add(baseMesh);
+
+        // Load overlay after base is loaded
+        textureLoader.load(
+          'my_panorama-overlay.jpg',
+          function(overlayTexture) {
+            let overlayMaterial = new THREE.MeshBasicMaterial({ 
+              map: overlayTexture, 
+              transparent: true, 
+              opacity: 0 // Start fully transparent
+            });
+            overlayMaterial.map.encoding = THREE.sRGBEncoding;
+            overlayMesh = new THREE.Mesh(geometry.clone(), overlayMaterial);
+            scene.add(overlayMesh);
+          }
+        );
       }
     );
 
@@ -47,6 +69,8 @@
     controls.enableZoom = false;
     controls.enablePan = false;
     controls.rotateSpeed = -0.25;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.10;
 
     function animate() {
       requestAnimationFrame(animate);
@@ -59,6 +83,29 @@
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Toggle overlay button
+    document.getElementById('toggleOverlay').addEventListener('click', function() {
+      if (!overlayMesh) return;
+      let targetOpacity = overlayMesh.material.opacity < 0.5 ? 1 : 0;
+      this.textContent = targetOpacity === 1 ? 'Hide Overlay' : 'Show Overlay';
+
+      let start = overlayMesh.material.opacity;
+      let startTime = performance.now();
+      let duration = 500; // ms
+
+      function fade(now) {
+        let elapsed = now - startTime;
+        let t = Math.min(elapsed / duration, 1);
+        overlayMesh.material.opacity = start + (targetOpacity - start) * t;
+        if (t < 1) {
+          requestAnimationFrame(fade);
+        } else {
+          overlayMesh.material.opacity = targetOpacity;
+        }
+      }
+      requestAnimationFrame(fade);
     });
   </script>
 </body>
